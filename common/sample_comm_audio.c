@@ -15,7 +15,7 @@
 
 #include "sample_comm.h"
 #include "acodec.h"
-#include "audio_aac_adp.h"
+#include "../audio/adp/audio_aac_adp.c"
 
 #ifdef HI_ACODEC_TYPE_TLV320AIC31
 #include "tlv320aic31.h"

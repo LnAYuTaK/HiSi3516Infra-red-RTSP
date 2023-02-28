@@ -9,8 +9,6 @@
   Created       : 2017
   Description   :
 ******************************************************************************/
-
-
 #ifdef __cplusplus
 #if __cplusplus
 extern "C" {
@@ -106,8 +104,8 @@ HI_S32 SAMPLE_COMM_VENC_UDP(VENC_STREAM_S *stStream)
     int ret,tmp;
 
     
-    if(recording && stStream->u32Seq > 0){         //丢弃前30帧，也可以不丢弃
-        if(stStream->u32PackCount >= 3){            //从I帧开始编码，保证文件开始就能播放
+    if(recording && stStream->u32Seq > 0){         //丢弃�?30帧，也可以不丢弃
+        if(stStream->u32PackCount >= 3){            //从I帧开始编码，保证文件开始就能播�?
             nRecordFlag = 1;
         }
 
@@ -1361,6 +1359,19 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  PIC_SIZE
             return HI_ERR_VENC_NOT_SUPPORT;
     }
 
+    #if 1
+    if(PT_MP4VIDEO == enType)
+    {
+
+       stVencChnAttr.stVencAttr.u32Profile      = u32Profile;
+       stVencChnAttr.stVencAttr.bByFrame        = HI_TRUE;
+    }
+    #endif
+
+
+
+
+
     if(PT_MJPEG == enType || PT_JPEG == enType )
     {
         stVencChnAttr.stGopAttr.enGopMode  = VENC_GOPMODE_NORMALP;
@@ -2093,8 +2104,6 @@ HI_S32 SAMPLE_COMM_VENC_QpmapSendFrame(VPSS_GRP VpssGrp,VPSS_CHN VpssChn[],VENC_
     return pthread_create(&gs_VencQpmapPid, 0, SAMPLE_COMM_QpmapSendFrameProc, (HI_VOID*)&stQpMapSendFramePara);
 }
 
-
-
 /******************************************************************************
 * funciton : get stream from each channels and save them
 ******************************************************************************/
@@ -2214,8 +2223,8 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc(HI_VOID* p)
         }
         else
         {
-            //for (i = 0; i < s32ChnTotal; i++)
-            for (i = 0; i < 1; i++)
+            for (i = 0; i < s32ChnTotal; i++)
+            // for (i = 0; i < 1; i++)
             {
                 if (FD_ISSET(VencFd[i], &read_fds))
                 {
@@ -2321,7 +2330,6 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc(HI_VOID* p)
                         fclose(pFile[i]);
                     }
                 }
-            }
         }
     }
     /*******************************************************
@@ -2336,6 +2344,14 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc(HI_VOID* p)
     }
     return NULL;
 }
+
+
+
+
+
+
+
+
 
 /******************************************************************************
 * funciton : get svc_t stream from h264 channels and save them
@@ -2581,7 +2597,6 @@ HI_VOID* SAMPLE_COMM_VENC_GetVencStreamProc_Svc_t(void* p)
     }
     return NULL;
 }
-
 /******************************************************************************
 * funciton : start get venc stream process thread
 ******************************************************************************/
@@ -2701,6 +2716,7 @@ HI_S32 SAMPLE_COMM_VENC_PlanToSemi(HI_U8* pY, HI_S32 yStride,
     free( ptu );
     free( ptv );
     return HI_SUCCESS;
+}
 }
 
 #ifdef __cplusplus

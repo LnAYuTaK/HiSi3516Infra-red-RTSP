@@ -1,7 +1,7 @@
 # Hisilicon Hi35xx sample Makefile.param
 
 ifeq ($(PARAM_FILE), )
-     PARAM_FILE:=../../Makefile.param
+     PARAM_FILE:=../Makefile.param
      include $(PARAM_FILE)
 endif
 
@@ -64,13 +64,16 @@ INC_FLAGS := -I$(REL_INC)
 
 ISP_VERSION := ISP_V2
 
+#########################################################################
+#2023 2.28 add by liukuan  Mp4v2Lib #
+INC_FLAGS += -I/root/Workspace/SDK/package/mpp/mp4v2-main/include
+MPI_LIBS  += /usr/local/lib/libmp4v2.a 
+#########################################################################
 CFLAGS += -Wall -g $(INC_FLAGS) -D$(HIARCH) -D$(HI_FPGA) -lpthread -lm -ldl -D$(ISP_VERSION)
 CFLAGS += -lstdc++
 CFLAGS += $(LIBS_CFLAGS)
 CFLAGS += $(MPP_CFLAGS)
 CFLAGS += -DSENSOR0_TYPE=$(SENSOR0_TYPE)
-
-
 ################ select audio codec type for your sample ################
 ACODEC_TYPE ?= ACODEC_TYPE_INNER
 #external acodec
@@ -113,7 +116,8 @@ ifeq ($(AUDIO_MODULE_LIB_TYPE), AUDIO_LIB_TYPE_STATIC)
 	AUDIO_LIBA += $(REL_LIB)/libaacsbrenc.a
 endif
 
-#########################################################################
+
+##############################################################
 COMM_SRC := $(wildcard $(COMMON_DIR)/*.c)
 COMM_OBJ := $(COMM_SRC:%.c=%.o)
 COMM_INC := -I$(COMMON_DIR)
