@@ -9,6 +9,8 @@ extern "C"
 #include "./Common/user_comm.h"
 #define mem_size 20 * 1024 // 20k
 
+
+
 static char logtmp[1024];
 // static int m_pseudoColor_index = 5;             // 伪彩号
 // unsigned char *pMem_pseudo_color = NULL; // 存储伪彩色板
@@ -16,21 +18,21 @@ static IRAY_VPSS_PICTURE vpss_picture;
 static VIDEO_FRAME_INFO_S vpss_stFrame; // vpss frame
 int picflag = 0;
 void *yuv2jpgtask(void *p);
-int strlen_xun(char arr[]) // 循环方法
-{
-    int i = 0;
-    while (arr[i] != '\0')
+    int strlen_xun(char arr[]) // 循环方法
     {
-        ++i;
+        int i = 0;
+        while (arr[i] != '\0')
+        {
+            ++i;
+        }
+        return i;
     }
-    return i;
-}
+
     /*yuv422   group 组号chn  通道号 pwd  地址图像格式最好在vpss转换成yuv422sp，
     其他得格式按照实际进行保存 YYYYYYYY UVUVUVUV
     增加isTakePic开关，如果要拍照保存就置1，完成伪彩+拍照功能*/ 
     void vpss_one_frame(int vpssGrp, int vpssChn, char *pwd, int picnum, int isTakePic)
     {
-
         int try_num = 10; // 尝试次数
         int s32Ret = 0;
 
@@ -85,6 +87,7 @@ int strlen_xun(char arr[]) // 循环方法
                 break; // 拿到帧了
         }
         VIDEO_FRAME_S *pVpssVBuf = &(vpss_stFrame.stVFrame);
+
         vpss_picture.phy_addr = pVpssVBuf->u64PhyAddr[0];
 
         vpss_picture.pUserPageAddr[0] = (HI_CHAR *)HI_MPI_SYS_Mmap(vpss_picture.phy_addr, 1280 * 1024 * 3 / 2);
@@ -100,7 +103,7 @@ int strlen_xun(char arr[]) // 循环方法
         memset(vpss_picture.pVBufVirt_C, 0x80, 1280 * 512);
 #endif
         //s32Ret = HI_MPI_VPSS_SendFrame(0, 0, &vpss_stFrame, 50);
-
+    HI_CHAR aszFileName[64];
 #if 1
         if (isTakePic == 1)
         {
@@ -256,7 +259,7 @@ int strlen_xun(char arr[]) // 循环方法
             printlog(logtmp);
             goto EXIT;
         }
-        /*config vpss*/
+        //VPSS 初始化
         hi_memset(&stVpssGrpAttr, sizeof(VPSS_GRP_ATTR_S), 0, sizeof(VPSS_GRP_ATTR_S));
         stVpssGrpAttr.stFrameRate.s32SrcFrameRate = -1;
         stVpssGrpAttr.stFrameRate.s32DstFrameRate = -1;
@@ -307,8 +310,6 @@ int strlen_xun(char arr[]) // 循环方法
             printlog(logtmp);
             goto EXIT1;
         }
-
-
         // vpss group 1
         // s32Ret = SAMPLE_COMM_VPSS_Start(1, abChnEnable, &stVpssGrpAttr, astVpssChnAttr);
         // if (HI_SUCCESS != s32Ret)
@@ -362,107 +363,119 @@ int strlen_xun(char arr[]) // 循环方法
                 usleep(100000);
             }
         }
-
         fd = -1;
         int picnum = 0;
-// //RTSP  
-        Rtsp_Init(dir_num);
- //Save  Mp4 Task 
-#ifdef  MP4_SAVE_ENBLE
-//     VENC_ATTR_S     stVencAttr;                   /*the attribute of video encoder*/
-//     VENC_RC_ATTR_S  stRcAttr;                     /*the attribute of rate  ctrl*/
-//     VENC_GOP_ATTR_S stGopAttr;                    /*the attribute of gop*/
-// } VENC_CHN_ATTR_S;
-    //Config 
+//RTSP  注意必须要开启RTSP才可以拍照 //需要解耦
+    Rtsp_Init(dir_num);
+
+    fd = open("/dev/gpio_dev", 0);
+    if (fd < 0)
+    {
+        printlog("Open button dev error!\n");
+    }
+//视频保存功能初始化
+#ifdef  H264_SAVE_ENBLE
     VENC_GOP_ATTR_S stGopAttr;
-    VENC_CHN     Mp4VencChn = 2;
+    //VENC 通道2 
+    VENC_CHN    StreamSaveVencChn = 2;
     stGopAttr.enGopMode = VENC_GOPMODE_SMARTP;
 	stGopAttr.stSmartP.s32BgQpDelta = 7;
 	stGopAttr.stSmartP.s32ViQpDelta = 2;
 	stGopAttr.stSmartP.u32BgInterval = 1200;
-	s32Ret = SAMPLE_COMM_VENC_Start(Mp4VencChn,PT_H264, PIC_720P, SAMPLE_RC_CBR, 0, HI_FALSE, &stGopAttr);
+	s32Ret = SAMPLE_COMM_VENC_Start(StreamSaveVencChn,PT_H264, PIC_720P, SAMPLE_RC_CBR, 0, HI_FALSE, &stGopAttr);
 	if (HI_SUCCESS != s32Ret)
 	{
-		SAMPLE_PRT("Error: start venc 2 failed. s32Ret: 0x%x !\n", s32Ret);
+		SAMPLE_PRT("Error: start venc H264 failed. s32Ret: 0x%x !\n", s32Ret);
 	}
 	//Mp4Bind
-	s32Ret = SAMPLE_COMM_VPSS_Bind_VENC(VpssGrp, VpssChn, Mp4VencChn); 
+	s32Ret = SAMPLE_COMM_VPSS_Bind_VENC(VpssGrp, VpssChn, StreamSaveVencChn); 
 	if (HI_SUCCESS != s32Ret)
 	{
-		SAMPLE_PRT("Error: Venc bind Vpss failed. s32Ret: 0x%x !n", s32Ret);
+		SAMPLE_PRT("Error: Venc bind H264 Vpss failed. s32Ret: 0x%x !n", s32Ret);
 	}
-    pthread_t  Mp4SaveTask;
-    VENC_THREAD_PARA_T para;
-    para.VeChn = Mp4VencChn;
-    para.stVencChnAttr.stVencAttr.enType = PT_H264;
-    para.s32Cnt = 1;
-    para. enSize = PIC_720P;
-    int result= pthread_create (&Mp4SaveTask,0,User_VENC_GetStream_Save,(HI_VOID*)&para);
 #endif
-        fd = open("/dev/gpio_dev", 0);
-        if (fd < 0)
+
+#ifdef  H264_SAVE_ENBLE
+    //开启视频保存功能
+    pthread_t  H264SaveTask;
+    VENC_THREAD_PARA_T H264SavePara;
+    H264SavePara.VeChn = StreamSaveVencChn;
+    H264SavePara.stVencChnAttr.stVencAttr.enType = PT_H264;
+    H264SavePara.s32Cnt = 1;
+    H264SavePara.enSize = PIC_720P;
+    memcpy(H264SavePara.filepath,dirname,256);
+    //视频保存线程//
+    int result= pthread_create (&H264SaveTask,0,User_VENC_GetStream_Save,(HI_VOID*)&H264SavePara);
+#endif
+
+//拍照功能初始化
+#ifdef   JPG_SAVE_ENBEL
+    //VENC 通道1
+    VENC_CHN    JPGVencChn = 1;
+    SIZE_S pstSize;
+    pstSize.u32Width = 1280;
+    pstSize.u32Height= 1024;
+    s32Ret = SAMPLE_COMM_VENC_SnapStart(JPGVencChn,&pstSize,HI_FALSE);
+    if (HI_SUCCESS != s32Ret)
+	{
+		SAMPLE_PRT("Error: start venc JPG failed. s32Ret: 0x%x !\n", s32Ret);
+	}
+    s32Ret = SAMPLE_COMM_VPSS_Bind_VENC(VpssGrp, VpssChn, JPGVencChn); 
+	if (HI_SUCCESS != s32Ret)
+	{
+		SAMPLE_PRT("Error: Venc JPG bind Vpss failed. s32Ret: 0x%x !n", s32Ret);
+	}
+#endif
+
+//拍照
+#ifdef   JPG_SAVE_ENBEL
+    pthread_t  JEPGFrameTask;
+    VENC_THREAD_JPEG_PARA_T JEPGFramePara;
+    JEPGFramePara.VencChn    = JPGVencChn;
+    JEPGFramePara.SnapCnt  = 1 ;//每次拍一张
+    JEPGFramePara.bSaveJpg = HI_TRUE;//拍完保存
+    memcpy(JEPGFramePara.filepath,dirname,256);
+    // JEPGFramePara.filepath = dirname;
+    unsigned int key = 0;
+    int PicNum  = 0 ; 
+    for (;;)
+    {
+        if(read(fd, &key, sizeof(key)>0))
         {
-            printlog("Open button dev error!\n");
+            //拍照 
+            pthread_create(&JEPGFrameTask,0,User_VENC_GetJPG_Save,(HI_VOID*)&JEPGFramePara);
+            PicNum ++;
+            usleep(5000000);
         }
-        unsigned int key = 0;
-        int ret;
-        while (1)
+        else
         {
-            // picflag = 1;
-            // usleep(500000);
-            ret = read(fd, &key, sizeof(key));
-            if (ret < 0)
-            {
-                printlog("read gpio error\n");
-            }
-            else
-            {
-                // SAMPLE_PRT("key = %d\n", key);
-                if (key == 1)
-                {
-                    vpss_one_frame(0, 0, dirname, picnum, 1);
-                    picnum++;
-                    usleep(300000);
-                }
-            }
+            printf("read gpio error\n");
         }
-        //         struct timeval start, end;
-        // double timeuse;
-
-        // pthread_t pictask;
-
-        // pthread_create(&pictask, 0, readgpiotask, NULL);
-
-        // gettimeofday(&start, NULL);
-
+    }
+#endif
+        // unsigned int key = 0;
+        // int ret;
         // while (1)
         // {
-            
-        //         usleep(100);
-        //     // struct timeval start, end;
-        //     // double timeuse;
-
-        //     gettimeofday(&end, NULL);
-        //     timeuse = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-        //     if (timeuse >= 1)
+        //     // picflag = 1;
+        //     // usleep(500000);
+        //     ret = read(fd, &key, sizeof(key));
+        //     if (ret < 0)
         //     {
-        //         gettimeofday(&start, NULL);
-        //         if (picflag)
-        //         {
-        //             vpss_one_frame(0, 0, dirname, picnum, 1);
-        //             picnum++;
-        //             picflag = 0;
-        //         }
-                
-        //         //else
-        //             //vpss_one_frame(0, 0, dirname, picnum, 0);
+        //         printlog("read gpio error\n");
         //     }
-
-        //     // gettimeofday(&end, NULL);
-        //     // timeuse = (end.tv_sec - start.tv_sec) * 1000.0 + (end.tv_usec - start.tv_usec) / 1000.0;
-        //     // printf("用时%fms\n", timeuse);
-
-        //     // usleep(30000);
+        //     else
+        //     {
+        //         SAMPLE_PRT("key = %d\n", key);
+        //         if (key == 1)
+        //         {
+        //  
+        //             // vpss_one_frame(0, 0, dirname, picnum, 1);
+        //             pthread_create (&JPGSaveTask,0,User_VENC_GetJPG_Save,(HI_VOID*)0);
+        //             // picnum++;
+        //             usleep(300000);
+        //         }
+        //     }
         // }
         close(fd);
         printf("Enter any key to enable 2Dim-Dis.\n");
@@ -483,8 +496,6 @@ int strlen_xun(char arr[]) // 循环方法
         SAMPLE_COMM_SYS_Exit();
         return s32Ret;
     }
-
-
     void *yuv2jpgtask(void *p)
     {
 
@@ -506,7 +517,6 @@ int strlen_xun(char arr[]) // 循环方法
 #ifndef YUV2JPEG
      // 保存yuv
         FILE *outfile_jpg;
-
         // test处理前yuv
         sprintf(filename, "%s/%d.yuv", info->pwd, info->picnum);
         
@@ -528,7 +538,6 @@ int strlen_xun(char arr[]) // 循环方法
         }
         fflush(outfile_jpg);
         fclose(outfile_jpg);
-
 #else
         char *rgb = (char *)malloc(sizeof(char) * 1280 * 1024 * 3);
         YUV420_TO_RGB24(info->Y, info->UV, 1280, 1024, rgb);
@@ -539,11 +548,8 @@ int strlen_xun(char arr[]) // 循环方法
         free(rgb);
 
 #endif
-
         sprintf(logtmp, "子线程_%d stop savejpg_s32Ret = %d\n", info->picnum, s32Ret);
-
         printlog(logtmp);
-    
         free(info);
         if (s32Ret != -1)
         {
@@ -551,11 +557,9 @@ int strlen_xun(char arr[]) // 循环方法
             usleep(100000);
             led_control(0);
         }
-
         // gettimeofday(&end, NULL);
         // timeuse = (end.tv_sec - start.tv_sec) * 1000 + (end.tv_usec - start.tv_usec) / 1000;
         // printf("子线程_%d stop timeuse: %d ms\n", info->picnum, timeuse);
-
         pthread_exit(NULL);
     }
 

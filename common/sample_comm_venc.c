@@ -103,7 +103,6 @@ HI_S32 SAMPLE_COMM_VENC_UDP(VENC_STREAM_S *stStream)
 
     int ret,tmp;
 
-    
     if(recording && stStream->u32Seq > 0){         //丢弃�?30帧，也可以不丢弃
         if(stStream->u32PackCount >= 3){            //从I帧开始编码，保证文件开始就能播�?
             nRecordFlag = 1;
@@ -1358,20 +1357,6 @@ HI_S32 SAMPLE_COMM_VENC_Creat(VENC_CHN VencChn, PAYLOAD_TYPE_E enType,  PIC_SIZE
             SAMPLE_PRT("cann't support this enType (%d) in this version!\n",enType);
             return HI_ERR_VENC_NOT_SUPPORT;
     }
-
-    #if 1
-    if(PT_MP4VIDEO == enType)
-    {
-
-       stVencChnAttr.stVencAttr.u32Profile      = u32Profile;
-       stVencChnAttr.stVencAttr.bByFrame        = HI_TRUE;
-    }
-    #endif
-
-
-
-
-
     if(PT_MJPEG == enType || PT_JPEG == enType )
     {
         stVencChnAttr.stGopAttr.enGopMode  = VENC_GOPMODE_NORMALP;
@@ -2100,7 +2085,6 @@ HI_S32 SAMPLE_COMM_VENC_QpmapSendFrame(VPSS_GRP VpssGrp,VPSS_CHN VpssChn[],VENC_
         stQpMapSendFramePara.VpssChn[i] = VpssChn[i];
         stQpMapSendFramePara.stSize[i]  = stSize[i];
     }
-
     return pthread_create(&gs_VencQpmapPid, 0, SAMPLE_COMM_QpmapSendFrameProc, (HI_VOID*)&stQpMapSendFramePara);
 }
 
@@ -2616,7 +2600,7 @@ HI_S32 SAMPLE_COMM_VENC_StartGetStream(VENC_CHN VeChn[],HI_S32 s32Cnt)
 /******************************************************************************
 * funciton : start get venc svc-t stream process thread
 ******************************************************************************/
-HI_S32 SAMPLE_COMM_VENC_StartGetStream_Svc_t(HI_S32 s32Cnt)
+HI_S32 GetStream_Svc_t(HI_S32 s32Cnt)
 {
     gs_stPara.bThreadStart = HI_TRUE;
     gs_stPara.s32Cnt = s32Cnt;

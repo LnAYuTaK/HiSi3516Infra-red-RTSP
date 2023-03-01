@@ -23,100 +23,9 @@ extern "C" {
 #include "sample_comm.h"
 #include  "user_comm.h"
 
-static HI_S32 Sample_MP4_ReadNalu(HI_U8 *pPack, HI_U32 nPackLen, unsigned int offSet, MP4ENC_NaluUnit *pNaluUnit)
-{
-	int i = offSet;
-	while (i < nPackLen)
-	{
-		if (pPack[i++] == 0x00 && pPack[i++] == 0x00 && pPack[i++] == 0x00 && pPack[i++] == 0x01)// 开始码
-		{
-			int pos = i;
-			while (pos < nPackLen)
-			{
-				if (pPack[pos++] == 0x00 && pPack[pos++] == 0x00 && pPack[pos++] == 0x00 && pPack[pos++] == 0x01)
-					break;
-			}
-			if (pos == nPackLen)
-				pNaluUnit->size = pos - i;
-			else
-				pNaluUnit->size = (pos - 4) - i;
-				
-			pNaluUnit->type = pPack[i] & 0x1f;
-			pNaluUnit->data = (unsigned char *)&pPack[i];
-			return (pNaluUnit->size + i - offSet);
-		}
-	}
-	return 0;
-}
-
-HI_S32 Sample_MP4_WRITE(MP4FileHandle hFile, MP4TrackId *pTrackId,VENC_STREAM_S *pstStream, MP4ENC_INFO *stMp4Info)
-{
-	int i = 0;
-	for (i = 0; i < pstStream->u32PackCount; i++)
-	{
-		HI_U8 *pPack = pstStream->pstPack[i].pu8Addr + pstStream->pstPack[i].u32Offset;
-		HI_U32 nPackLen = pstStream->pstPack[i].u32Len - pstStream->pstPack[i].u32Offset;
-
-		MP4ENC_NaluUnit stNaluUnit;
-		memset(&stNaluUnit, 0, sizeof(stNaluUnit));
-		int nPos = 0, nLen = 0;
-		while ((nLen = Sample_MP4_ReadNalu(pPack, nPackLen, nPos, &stNaluUnit)) != 0)
-		{
-			switch (stNaluUnit.type)
-			{
-			case H264E_NALU_SPS:
-			if (*pTrackId == MP4_INVALID_TRACK_ID)
-     			{
-      				*pTrackId = MP4AddH264VideoTrack(hFile, 90000, 90000 / stMp4Info->u32FrameRate, stMp4Info->u32Width, stMp4Info->u32Height, stNaluUnit.data[1], stNaluUnit.data[2], stNaluUnit.data[3], 3);
-      				if (*pTrackId == MP4_INVALID_TRACK_ID)
-     				{
-       					return HI_FAILURE;
-     				}
-      				MP4SetVideoProfileLevel(hFile, stMp4Info->u32Profile);
-      				MP4AddH264SequenceParameterSet(hFile,*pTrackId,stNaluUnit.data,stNaluUnit.size);
-     			}
-     			break;
-			case H264E_NALU_PPS:
-    			if (*pTrackId == MP4_INVALID_TRACK_ID)
-     			{
-      				break;
-     			}
-			MP4AddH264PictureParameterSet(hFile,*pTrackId,stNaluUnit.data,stNaluUnit.size);
-			break;
-			case H264E_NALU_IDRSLICE:
-			case H264E_NALU_PSLICE:
-			{
-			if (*pTrackId == MP4_INVALID_TRACK_ID)
-      			{
-       				break;
-      			}
-			int nDataLen = stNaluUnit.size + 4;
-      			unsigned char *data = (unsigned char *)malloc(nDataLen);
-      			data[0] = stNaluUnit.size >> 24;
-      			data[1] = stNaluUnit.size >> 16;
-      			data[2] = stNaluUnit.size >> 8;
-      			data[3] = stNaluUnit.size & 0xff;
-      			memcpy(data + 4, stNaluUnit.data, stNaluUnit.size);
-			if (!MP4WriteSample(hFile, *pTrackId, data, nDataLen, MP4_INVALID_DURATION, 0, 1))
-      			{
-       				free(data);
-       				return HI_FAILURE;
-      			}
-			free(data);
-			}
-			break;
-			default :
-			break;
-		}
-		nPos += nLen;
-		}
-	}
-	return HI_SUCCESS;
-}
-
 /**
- * @brief  通过Mp4V2 原生转换H264码流成mp4
- * @param p 
+ * @brief  保存H264视频流线程//
+ * @param   
  * @return HI_VOID* 
  */
 HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
@@ -135,6 +44,10 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
 	HI_S32 s32ChnTotal = pstPara->s32Cnt;
     VENC_CHN VencChn = pstPara->VeChn;
     PAYLOAD_TYPE_E enPayLoadType = stVencChnAttr.stVencAttr.enType;
+    char filename[256];
+	memcpy(filename,pstPara->filepath,256);
+
+
 	SIZE_S stPicSize;
 	s32Ret = SAMPLE_COMM_SYS_GetPicSize(pstPara->enSize,&stPicSize);
     if (HI_SUCCESS != s32Ret)
@@ -150,11 +63,12 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
         return NULL;
     }
     //暂时定义H264
-    sprintf(aszFileName, "stream_chn0%d%s",  VencChn, ".h264");//
-    pFile = fopen(aszFileName, "wb");
+	char savefile[300]    = {0};
+    sprintf(savefile, "%s/Ch%d%s",filename,VencChn,".h264");//
+    pFile = fopen(savefile, "wb");
     if (!pFile)
     {
-        SAMPLE_PRT("open file[%s] failed!\n", aszFileName);
+        SAMPLE_PRT("open file[%s] failed!\n",savefile);
         return NULL;
     }
     VencFd = HI_MPI_VENC_GetFd(VencChn);//获取编码器的文件描述符，以便后面能用select来IO复用
@@ -167,7 +81,6 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
     {
         maxfd = VencFd;
     }
-	
 	while (HI_TRUE)
 	{
 		FD_ZERO(&read_fds);
@@ -241,10 +154,208 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
 		}
 	}
 	fclose(pFile);
-
 	return NULL;
 }
 
+static HI_S32 gs_s32SnapCnt = 0;
+//抓拍拍照线程函数
+HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
+{
+    VENC_THREAD_JPEG_PARA_T *para  = (VENC_THREAD_JPEG_PARA_T *)p;
+    VENC_CHN VencChn  =  para->VencChn;
+	HI_U32   SnapCnt  =  para->SnapCnt;
+	HI_BOOL  bSaveJpg =  para->bSaveJpg;
+	char filename[256];
+	memcpy(filename,para->filepath,256);
+    struct timeval TimeoutVal;
+    fd_set read_fds;
+    HI_S32 s32VencFd;
+    VENC_CHN_STATUS_S stStat;
+    VENC_STREAM_S stStream;
+    HI_S32 s32Ret;
+    VENC_RECV_PIC_PARAM_S  stRecvParam;
+    MPP_CHN_S stDestChn;
+    MPP_CHN_S stSrcChn;
+    VPSS_CHN_ATTR_S stVpssChnAttr;
+    HI_U32 i;
+#ifdef __HuaweiLite__
+    VENC_STREAM_BUF_INFO_S  stStreamBufInfo;
+#endif
+    /******************************************
+     step 2:  Start Recv Venc Pictures
+    ******************************************/
+    stRecvParam.s32RecvPicNum = SnapCnt;
+    s32Ret = HI_MPI_VENC_StartRecvFrame(VencChn, &stRecvParam);
+    if (HI_SUCCESS != s32Ret)
+    {
+        SAMPLE_PRT("HI_MPI_VENC_StartRecvPic faild with%#x!\n", s32Ret);
+        return HI_FAILURE;
+    }
+
+    /******************************************
+     step 3:  Start Recv Venc Pictures
+    ******************************************/
+    stDestChn.enModId  = HI_ID_VENC;
+    stDestChn.s32DevId = 0;
+    stDestChn.s32ChnId = VencChn;
+    s32Ret = HI_MPI_SYS_GetBindbyDest(&stDestChn, &stSrcChn);
+    if (s32Ret == HI_SUCCESS && stSrcChn.enModId == HI_ID_VPSS)
+    {
+        s32Ret = HI_MPI_VPSS_GetChnAttr(stSrcChn.s32DevId, stSrcChn.s32ChnId, &stVpssChnAttr);
+        if (s32Ret == HI_SUCCESS && stVpssChnAttr.enCompressMode != COMPRESS_MODE_NONE)
+        {
+            s32Ret = HI_MPI_VPSS_TriggerSnapFrame(stSrcChn.s32DevId, stSrcChn.s32ChnId, SnapCnt);
+            if (s32Ret != HI_SUCCESS)
+            {
+                SAMPLE_PRT("call HI_MPI_VPSS_TriggerSnapFrame Grp = %d, ChanId = %d, SnapCnt = %d return failed(0x%x)!\n",
+                    stSrcChn.s32DevId, stSrcChn.s32ChnId, SnapCnt, s32Ret);
+
+                return HI_FAILURE;
+            }
+        }
+    }
+
+    /******************************************
+     step 4:  recv picture
+    ******************************************/
+    s32VencFd = HI_MPI_VENC_GetFd(VencChn);
+    if (s32VencFd < 0)
+    {
+        SAMPLE_PRT("HI_MPI_VENC_GetFd faild with%#x!\n", s32VencFd);
+        return HI_FAILURE;
+    }
+
+    for(i=0; i<SnapCnt; i++)
+    {
+        FD_ZERO(&read_fds);
+        FD_SET(s32VencFd, &read_fds);
+        TimeoutVal.tv_sec  = 10;
+        TimeoutVal.tv_usec = 0;
+        s32Ret = select(s32VencFd + 1, &read_fds, NULL, NULL, &TimeoutVal);
+        if (s32Ret < 0)
+        {
+            SAMPLE_PRT("snap select failed!\n");
+            return HI_FAILURE;
+        }
+        else if (0 == s32Ret)
+        {
+            SAMPLE_PRT("snap time out!\n");
+            return HI_FAILURE;
+        }
+        else
+        {
+            if (FD_ISSET(s32VencFd, &read_fds))
+            {
+                s32Ret = HI_MPI_VENC_QueryStatus(VencChn, &stStat);
+                if (s32Ret != HI_SUCCESS)
+                {
+                    SAMPLE_PRT("HI_MPI_VENC_QueryStatus failed with %#x!\n", s32Ret);
+                    return HI_FAILURE;
+                }
+                if (0 == stStat.u32CurPacks)
+                {
+                    SAMPLE_PRT("NOTE: Current  frame is NULL!\n");
+                    return HI_SUCCESS;
+                }
+                stStream.pstPack = (VENC_PACK_S*)malloc(sizeof(VENC_PACK_S) * stStat.u32CurPacks);
+                if (NULL == stStream.pstPack)
+                {
+                    SAMPLE_PRT("malloc memory failed!\n");
+                    return HI_FAILURE;
+                }
+                stStream.u32PackCount = stStat.u32CurPacks;
+                s32Ret = HI_MPI_VENC_GetStream(VencChn, &stStream, -1);
+                if (HI_SUCCESS != s32Ret)
+                {
+                    SAMPLE_PRT("HI_MPI_VENC_GetStream failed with %#x!\n", s32Ret);
+
+                    free(stStream.pstPack);
+                    stStream.pstPack = NULL;
+                    return HI_FAILURE;
+                }
+                if(bSaveJpg)
+                {
+                    FILE* pFile;
+					char savefile[258]    = {0};
+                    snprintf(savefile,258, "%s/pic_%d.jpg",filename,gs_s32SnapCnt);
+                    printf("SAVEFILE:  %s\r\n",savefile);
+                    pFile = fopen(savefile, "wb");
+                    if (pFile == NULL)
+                    {
+                        SAMPLE_PRT("open file err\n");
+                        free(stStream.pstPack);
+                        stStream.pstPack = NULL;
+                        return HI_FAILURE;
+                    }
+#ifndef __HuaweiLite__
+                    s32Ret = SAMPLE_COMM_VENC_SaveStream(pFile, &stStream);
+                    if (HI_SUCCESS != s32Ret)
+                    {
+                        SAMPLE_PRT("save snap picture failed!\n");
+
+                        free(stStream.pstPack);
+                        stStream.pstPack = NULL;
+
+                        fclose(pFile);
+                        return HI_FAILURE;
+                    }
+#else
+                    s32Ret = HI_MPI_VENC_GetStreamBufInfo (VencChn, &stStreamBufInfo);
+                    if (HI_SUCCESS != s32Ret)
+                    {
+                        SAMPLE_PRT("HI_MPI_VENC_GetStreamBufInfo failed with %#x!\n", s32Ret);
+
+                        free(stStream.pstPack);
+                        stStream.pstPack = NULL;
+
+                        fclose(pFile);
+                        return HI_FAILURE;
+                    }
+
+                    s32Ret = SAMPLE_COMM_VENC_SaveStream_PhyAddr(pFile, &stStreamBufInfo, &stStream);
+                    if (HI_SUCCESS != s32Ret)
+                    {
+                        SAMPLE_PRT("save snap picture failed!\n");
+
+                        free(stStream.pstPack);
+                        stStream.pstPack = NULL;
+
+                        fclose(pFile);
+                        return HI_FAILURE;
+                    }
+#endif
+
+                    fclose(pFile);
+                    gs_s32SnapCnt++;
+                }
+
+                s32Ret = HI_MPI_VENC_ReleaseStream(VencChn, &stStream);
+                if (HI_SUCCESS != s32Ret)
+                {
+                    SAMPLE_PRT("HI_MPI_VENC_ReleaseStream failed with %#x!\n", s32Ret);
+
+                    free(stStream.pstPack);
+                    stStream.pstPack = NULL;
+
+                    return HI_FAILURE;
+                }
+
+                free(stStream.pstPack);
+                stStream.pstPack = NULL;
+            }
+        }
+    }
+    /******************************************
+     step 5:  stop recv picture
+    ******************************************/
+    s32Ret = HI_MPI_VENC_StopRecvFrame(VencChn);
+    if (s32Ret != HI_SUCCESS)
+    {
+        SAMPLE_PRT("HI_MPI_VENC_StopRecvPic failed with %#x!\n",  s32Ret);
+        return HI_FAILURE;
+    }
+    return HI_SUCCESS;
+}
 #ifdef __cplusplus
 #if __cplusplus
 }

@@ -8,8 +8,6 @@
 int main(int argc, char *argv[])
 #endif
 {
-
-
         HI_S32 s32Ret = HI_FAILURE;
         HI_S32 s32Index;
         HI_U32 u32VoIntfType = 0;

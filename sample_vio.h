@@ -41,8 +41,8 @@ extern "C" {
 #endif
 
 
-#define MP4_SAVE_ENBLE 
-
+#define   H264_SAVE_ENBLE 
+#define   JPG_SAVE_ENBEL
 
 typedef struct iray_vpss_picture
 {
