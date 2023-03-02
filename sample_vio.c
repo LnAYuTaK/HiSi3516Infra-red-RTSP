@@ -8,9 +8,6 @@ extern "C"
 #include "sample_vio.h"
 #include "./Common/user_comm.h"
 #define mem_size 20 * 1024 // 20k
-
-
-
 static char logtmp[1024];
 // static int m_pseudoColor_index = 5;             // 伪彩号
 // unsigned char *pMem_pseudo_color = NULL; // 存储伪彩色板
@@ -160,7 +157,7 @@ void *yuv2jpgtask(void *p);
        ----- Start  Vpss ----
        ------Bind   Vpss---- 
     */ 
-    HI_S32 SAMPLE_VIO_ViOnlineVpssOffline_ISPDIS(HI_U32 u32VoIntfType)
+    HI_S32 APP(HI_U32 u32VoIntfType)
     {
         HI_S32 s32Ret = HI_SUCCESS;
 
@@ -367,7 +364,6 @@ void *yuv2jpgtask(void *p);
         int picnum = 0;
 //RTSP  注意必须要开启RTSP才可以拍照 //需要解耦
     Rtsp_Init(dir_num);
-
     fd = open("/dev/gpio_dev", 0);
     if (fd < 0)
     {
@@ -440,17 +436,18 @@ void *yuv2jpgtask(void *p);
     int PicNum  = 0 ; 
     for (;;)
     {
-        if(read(fd, &key, sizeof(key)>0))
-        {
+        // if(read(fd, &key, sizeof(key)>0))
+        // {
             //拍照 
             pthread_create(&JEPGFrameTask,0,User_VENC_GetJPG_Save,(HI_VOID*)&JEPGFramePara);
+            pthread_join(JEPGFrameTask, NULL);
             PicNum ++;
-            usleep(5000000);
-        }
-        else
-        {
-            printf("read gpio error\n");
-        }
+            usleep(500000);
+        // }
+        // else
+        // {
+        //     printf("read gpio error\n");
+        // }
     }
 #endif
         // unsigned int key = 0;

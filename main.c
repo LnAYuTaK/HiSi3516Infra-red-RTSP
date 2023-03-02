@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
         led_control(0);
 //APP Start 
         u32VoIntfType = 0;
-        SAMPLE_VIO_ViOnlineVpssOffline_ISPDIS(u32VoIntfType);
+        APP(u32VoIntfType);
         return 1;
 }
 

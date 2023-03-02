@@ -88,7 +88,7 @@ typedef struct thread_data
 } THREAD_DATA;
 
 void SAMPLE_VIO_HandleSig(HI_S32 signo);
-HI_S32 SAMPLE_VIO_ViOnlineVpssOffline_ISPDIS(HI_U32 u32VoIntfType);
+HI_S32 APP(HI_U32 u32VoIntfType);
 
 HI_S32 SAMPLE_VIO_WDR_LDC_DIS_SPREAD(HI_U32 u32VoIntfType);
 HI_S32 SAMPLE_VIO_ViDoublePipeRoute(HI_U32 u32VoIntfType);

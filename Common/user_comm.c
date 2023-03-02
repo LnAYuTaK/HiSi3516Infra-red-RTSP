@@ -23,6 +23,22 @@ extern "C" {
 #include "sample_comm.h"
 #include  "user_comm.h"
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /**
  * @brief  保存H264视频流线程//
  * @param   
@@ -47,7 +63,6 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
     char filename[256];
 	memcpy(filename,pstPara->filepath,256);
 
-
 	SIZE_S stPicSize;
 	s32Ret = SAMPLE_COMM_SYS_GetPicSize(pstPara->enSize,&stPicSize);
     if (HI_SUCCESS != s32Ret)
@@ -71,7 +86,8 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
         SAMPLE_PRT("open file[%s] failed!\n",savefile);
         return NULL;
     }
-    VencFd = HI_MPI_VENC_GetFd(VencChn);//获取编码器的文件描述符，以便后面能用select来IO复用
+    //获取编码器的文件描述符，用select来IO复用
+    VencFd = HI_MPI_VENC_GetFd(VencChn);
     if (VencFd < 0)
     {
         SAMPLE_PRT("HI_MPI_VENC_GetFd failed with %#x!\n", VencFd);
@@ -133,6 +149,7 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
                     SAMPLE_PRT("HI_MPI_VENC_GetStream failed with %#x!\n", s32Ret);
                     break;
                 }
+                //写入到文件
                 HI_S32 u32PackIndex;
                 for (u32PackIndex= 0;u32PackIndex < stStream.u32PackCount; u32PackIndex++)
                 {
@@ -141,10 +158,12 @@ HI_VOID* User_VENC_GetStream_Save(HI_VOID* p)
                             1, pFile);
                     fflush(pFile);
                 }
-                s32Ret = HI_MPI_VENC_ReleaseStream(VencChn, &stStream);//保存后要释放码流
+                //保存后要释放码流
+                s32Ret = HI_MPI_VENC_ReleaseStream(VencChn, &stStream);
                 if (HI_SUCCESS != s32Ret)
                 {
-                    free(stStream.pstPack);//获取失败则要释放前面分配的内存，否则会造成内存溢出
+                     //获取失败则要释放前面分配的内存，否则会造成内存溢出
+                    free(stStream.pstPack);
                     stStream.pstPack = NULL;
                     break;
                 }
@@ -181,9 +200,7 @@ HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
 #ifdef __HuaweiLite__
     VENC_STREAM_BUF_INFO_S  stStreamBufInfo;
 #endif
-    /******************************************
-     step 2:  Start Recv Venc Pictures
-    ******************************************/
+    //开始保存图片
     stRecvParam.s32RecvPicNum = SnapCnt;
     s32Ret = HI_MPI_VENC_StartRecvFrame(VencChn, &stRecvParam);
     if (HI_SUCCESS != s32Ret)
@@ -215,16 +232,14 @@ HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
         }
     }
 
-    /******************************************
-     step 4:  recv picture
-    ******************************************/
+    //同样的获取FD 用来IO 复用
     s32VencFd = HI_MPI_VENC_GetFd(VencChn);
     if (s32VencFd < 0)
     {
         SAMPLE_PRT("HI_MPI_VENC_GetFd faild with%#x!\n", s32VencFd);
         return HI_FAILURE;
     }
-
+    //Select 
     for(i=0; i<SnapCnt; i++)
     {
         FD_ZERO(&read_fds);
@@ -276,8 +291,8 @@ HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
                 if(bSaveJpg)
                 {
                     FILE* pFile;
-					char savefile[258]    = {0};
-                    snprintf(savefile,258, "%s/pic_%d.jpg",filename,gs_s32SnapCnt);
+					char savefile[300]    = {0};
+                    snprintf(savefile,300, "%s/pic_%d.jpg",filename,gs_s32SnapCnt);
                     printf("SAVEFILE:  %s\r\n",savefile);
                     pFile = fopen(savefile, "wb");
                     if (pFile == NULL)
@@ -295,7 +310,6 @@ HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
 
                         free(stStream.pstPack);
                         stStream.pstPack = NULL;
-
                         fclose(pFile);
                         return HI_FAILURE;
                     }
@@ -324,7 +338,6 @@ HI_VOID *User_VENC_GetJPG_Save(HI_VOID* p)
                         return HI_FAILURE;
                     }
 #endif
-
                     fclose(pFile);
                     gs_s32SnapCnt++;
                 }
