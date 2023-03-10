@@ -1,1 +1,0 @@
-cmd_/root/Workspace/SDK/package/mpp/mpp/sample/gpiodrv/gpiodrv.ko := arm-himix100-linux-ld -EL -r  -T ./scripts/module-common.lds --build-id  -o /root/Workspace/SDK/package/mpp/mpp/sample/gpiodrv/gpiodrv.ko /root/Workspace/SDK/package/mpp/mpp/sample/gpiodrv/gpiodrv.o /root/Workspace/SDK/package/mpp/mpp/sample/gpiodrv/gpiodrv.mod.o ;  true
